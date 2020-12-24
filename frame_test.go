@@ -46,11 +46,11 @@ func Test_frame_1(t *testing.T) {
 		{Name: "referer", DataType: TypeStr},
 	}
 	getter := map[string]func(i int) Value{
-		"traceId":        func(i int) Value { return strValue(strconv.FormatInt(int64(ID64()),16)) },
+		"traceId":        func(i int) Value { return strValue(strconv.FormatInt(int64(ID64()), 16)) },
 		"userId":         func(i int) Value { return strValue([]string{"abc", "why"}[i%2]) },
 		"timestamp":      func(i int) Value { return intValue(time.Now().Unix()) },
 		"userInfoOrigin": func(i int) Value { return intValue(i % 2) },
-		"sessionId":      func(i int) Value { return strValue(strconv.FormatInt(int64(ID64()),16)) },
+		"sessionId":      func(i int) Value { return strValue(strconv.FormatInt(int64(ID64()), 16)) },
 		"sysId":          func(i int) Value { return intValue(i % 5) },
 		"agentId":        func(i int) Value { return intValue(i % 20) },
 		"requestURI":     func(i int) Value { return strValue("http://www.sina.com.cn") },
@@ -127,11 +127,11 @@ func Test_frame_3(t *testing.T) {
 	}
 	tv := time.Now().Unix()
 	getter := map[string]func(i int) Value{
-		"traceId":        func(i int) Value { return strValue(strconv.FormatInt(int64(ID64()),16)) },
+		"traceId":        func(i int) Value { return strValue(strconv.FormatInt(int64(ID64()), 16)) },
 		"userId":         func(i int) Value { return strValue([]string{"abc", "why"}[i%2]) },
 		"timestamp":      func(i int) Value { return intValue(tv) },
 		"userInfoOrigin": func(i int) Value { return intValue(i % 2) },
-		"sessionId":      func(i int) Value { return strValue(strconv.FormatInt(int64(ID64()),16)) },
+		"sessionId":      func(i int) Value { return strValue(strconv.FormatInt(int64(ID64()), 16)) },
 		"sysId":          func(i int) Value { return intValue(i % 5) },
 		"agentId":        func(i int) Value { return intValue(i % 20) },
 		"requestURI":     func(i int) Value { return strValue("http://www.sina.com.cn") },
@@ -150,7 +150,11 @@ func Test_frame_3(t *testing.T) {
 	var err error
 	for i := 0; err == nil && i < 1000000; i++ { //214694
 		err = frame.Add(func(name string) (value Value, err error) {
-			return getter[name](i), nil
+			if f, ok := getter[name]; ok {
+				return f(i), nil
+			} else {
+				return nil, nil
+			}
 		}, func(iter func(key string) error) (err error) {
 			if err = iter(ti.Name); err != nil {
 				return
