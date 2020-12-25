@@ -73,8 +73,8 @@ func (p PacketFormat) MarshalJSON() ([]byte, error) {
 		return []byte(`"JsonRow"`), nil
 	case PfJsonArray:
 		return []byte(`"JsonArray"`), nil
-	case PfJsonColumns:
-		return []byte(`"JsonColumns"`), nil
+	case PfJsonColumn:
+		return []byte(`"JsonColumn"`), nil
 	default:
 		return nil, errs.New("unknown packet format!")
 	}
@@ -90,8 +90,8 @@ func (p *PacketFormat) UnmarshalJSON(v []byte) error {
 		*p = PfJsonRow
 	case `"json"`, `"jsonarray"`:
 		*p = PfJsonArray
-	case `"jsoncolumns"`, `"columns"`:
-		*p = PfJsonColumns
+	case `"jsoncolumn"`, `"column"`:
+		*p = PfJsonColumn
 	default:
 		return errs.New("unkown packet format!")
 	}
@@ -103,7 +103,7 @@ const (
 	PfTxtRow
 	PfJsonRow
 	PfJsonArray
-	PfJsonColumns
+	PfJsonColumn
 )
 
 func ParsePacketFormat(s string, _default PacketFormat) PacketFormat {
@@ -112,6 +112,10 @@ func ParsePacketFormat(s string, _default PacketFormat) PacketFormat {
 		return PfTxtRow
 	case "JsonRow":
 		return PfJsonRow
+	case "PfJsonArray":
+		return PfJsonArray
+	case "PfJsonColumn":
+		return PfJsonColumn
 	}
 	return _default
 }
@@ -291,7 +295,40 @@ func (this FrameReader) JsonArrayWriteTo(w io.Writer) (n int64, err error) {
 	}
 	return
 }
-func (this FrameReader) JsonColumnsReadFrom(r io.Reader) (n int64, err error) {
+func (this FrameReader) JsonColumnWriteTo(w io.Writer) (n int64, err error) {
+	if this.DataFrame == nil {
+		return 0, errs.New("frame is nil!")
+	}
+	if vars, _, rows, err := this.outVars(); err == nil && len(vars) > 0 {
+		outs := make([][]interface{}, len(vars))
+		count, start, end := 0, this.Start, this.End
+		if end <= 0 {
+			end = rows.Len()
+		}
+		rows.Range(func(pos int) bool {
+			if count < start {
+				return true
+			} else if count >= end {
+				return false
+			}
+			count++
+			for col := 0; col < len(vars); col++ {
+				if vars[col].GetName() == "isError" {
+					println("111")
+				}
+				outs[col] = append(outs[col], vars[col].Get(pos).Base())
+			}
+			return true
+		})
+		ret := make(map[string][]interface{})
+		for col := 0; col < len(vars); col++ {
+			ret[vars[col].GetName()] = outs[col]
+		}
+		err = json.NewEncoder(w).Encode(ret)
+	}
+	return
+}
+func (this FrameWriter) JsonColumnReadFrom(r io.Reader) (n int64, err error) {
 	var ok bool
 	var col int
 	var arr []interface{}
@@ -303,7 +340,7 @@ func (this FrameReader) JsonColumnsReadFrom(r io.Reader) (n int64, err error) {
 		return
 	}
 	for name, vars := range outs {
-		if col, ok = this.names[name]; ok {
+		if col, ok = this.names[name]; !ok {
 			col = len(this.vars)
 			vars := newValues(values{}).Resize(count)
 			this.vars = append(this.vars, vars)
@@ -328,23 +365,6 @@ func (this FrameReader) JsonColumnsReadFrom(r io.Reader) (n int64, err error) {
 		this.vars[col].Resize(count)
 	}
 	this.count = count
-	return
-}
-func (this FrameReader) JsonColumnsWriteTo(w io.Writer) (n int64, err error) {
-	if this.DataFrame == nil {
-		return 0, errs.New("frame is nil!")
-	}
-	if vars, names, rows, err := this.outVars(); err == nil && len(vars) > 0 {
-		outs := make(map[string]interface{})
-		for col := range vars {
-			rows.Range(func(row int) bool {
-				vars[col].Get(row)
-				return true
-			})
-			outs[names[col]] = vars[col].ToSlice(rows)
-		}
-		return 0, json.NewEncoder(w).Encode(outs)
-	}
 	return
 }
 
@@ -737,6 +757,8 @@ func (this FrameReader) WriteTo(w io.Writer) (n int64, err error) {
 		return this.JsonRowWriteTo(w)
 	case PfJsonArray:
 		return this.JsonArrayWriteTo(w)
+	case PfJsonColumn:
+		return this.JsonColumnWriteTo(w)
 	default:
 		return this.TarWriteTo(w)
 	}
@@ -759,6 +781,8 @@ func (this *FrameWriter) ReadFrom(r io.Reader) (n int64, err error) {
 		return this.TarReadFrom(r)
 	case PfJsonRow:
 		return this.JsonReadFrom(r)
+	case PfJsonColumn:
+		return this.JsonColumnReadFrom(r)
 	default:
 		return this.TarReadFrom(r)
 	}

@@ -1,7 +1,6 @@
 package ecu
 
 import (
-
 	"bufio"
 	"io"
 	"strconv"
@@ -114,7 +113,7 @@ func (v boolValue) Base() interface{} {
 }
 
 func (v boolValue) Nil() bool {
-	return v != 2
+	return v == 2
 }
 
 func (v boolValue) Bool() bool {
